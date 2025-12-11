@@ -1,0 +1,23 @@
+#### QC 
+#Uses porechop to remove primers and adapters from the combined FASTQ file.
+#Uses fastcat to filter reads by length (1200–1950 bp) and minimum quality (Q≥10). Saves the final trimmed FASTQ as barcode_XX.trimmed.fastq.
+#################################################################################
+
+
+#!/bin/bash
+for barcode in $(seq -w 1 24); do 
+    echo "#-------------------- Trimming barcode_${barcode} fastqs --------------------#"
+
+    # Step 1: Primer and adaptors removal Porechop
+    porechop \
+        -i ../combined_fastq_library_f/barcode_${barcode}.combined.fastq \
+        -o barcode_${barcode}.porechop.fastq \
+	--check_reads 1000 \
+	--discard_middle \
+        --extra_end_trim 0
+    # Step 2: trimming
+    fastcat \
+        --min_length 1200 --max_length 1950 --min_qscore 10 \
+        barcode_${barcode}.porechop.fastq > barcode_${barcode}.trimmed.fastq 
+done
+
