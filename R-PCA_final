@@ -1,0 +1,158 @@
+
+# ==========================================================
+# 📦 LIBRERIE
+# ==========================================================
+library(tidyverse)
+library(compositions)   # per la trasformazione CLR
+library(sva)            # per ComBat
+library(ggrepel)        # per etichette PCA leggibili
+library(phyloseq)       # opzionale, per gestioni microbioma
+
+# ==========================================================
+# 1️⃣ IMPORTA I DATI DELLE LIBRERIE
+# ==========================================================
+
+# Libreria A
+files_A <- list.files("library_a_41125_16s/taxonomic_abundance_kraken2_v2/",
+                      pattern = "barcode_\\d+\\.bracken$", full.names = TRUE)
+tbl_A <- map_dfr(files_A, ~ read.delim(.x, header = TRUE) %>%
+                   mutate(sample = basename(.x), library = "A"))
+
+# Libreria B
+files_B <- list.files("library_b_41125_16s/taxonomic_abundance_kraken2_v2/",
+                      pattern = "barcode_\\d+\\.bracken$", full.names = TRUE)
+tbl_B <- map_dfr(files_B, ~ read.delim(.x, header = TRUE) %>%
+                   mutate(sample = basename(.x), library = "B"))
+
+# Libreria C
+files_C <- list.files("library_c_51125_16s/taxonomic_abundance_kraken2_v2/",
+                      pattern = "barcode_\\d+\\.bracken$", full.names = TRUE)
+tbl_C <- map_dfr(files_C, ~ read.delim(.x, header = TRUE) %>%
+                   mutate(sample = basename(.x), library = "C"))
+
+# Libreria D
+files_D <- list.files("library_d_51125_16s/taxonomic_abundance_kraken2_v2/",
+                      pattern = "barcode_\\d+\\.bracken$", full.names = TRUE)
+tbl_D <- map_dfr(files_D, ~ read.delim(.x, header = TRUE) %>%
+                   mutate(sample = basename(.x), library = "D"))
+
+# ==========================================================
+# 2️⃣ UNISCI TUTTE LE LIBRERIE
+# ==========================================================
+tbl_all <- bind_rows(tbl_A, tbl_B, tbl_C, tbl_D)
+
+# ==========================================================
+# 3️⃣ CALCOLA ABBONDANZE RELATIVE PER OGNI CAMPIONE
+# ==========================================================
+tbl_rel <- tbl_all %>%
+  group_by(library, sample) %>%
+  mutate(rel_abund = new_est_reads / sum(new_est_reads)) %>%
+  ungroup()
+
+# Somma eventuali duplicati per library, sample, name
+tbl_rel_sum <- tbl_rel %>%
+  group_by(library, sample, name) %>%
+  summarise(rel_abund = sum(rel_abund), .groups = "drop")
+
+# ==========================================================
+# 4️⃣ CREA MATRICE CAMPIONI x TAXA
+# ==========================================================
+tbl_wide <- tbl_rel_sum %>%
+  mutate(sample_id = paste(library, sample, sep = "_")) %>%
+  select(sample_id, everything(), -library, -sample) %>%
+  pivot_wider(
+    names_from = name,
+    values_from = rel_abund,
+    values_fill = list(rel_abund = 0)
+  )
+
+tbl_mat <- tbl_wide %>%
+  column_to_rownames("sample_id") %>%
+  as.data.frame()
+
+# ==========================================================
+# 5️⃣ FILTRA TAXA POCO PRESENTI
+# ==========================================================
+keep_taxa <- colMeans(tbl_mat > 0) > 0.05
+tbl_mat <- tbl_mat[, keep_taxa]
+
+# ==========================================================
+# 6️⃣ TRASFORMAZIONE CLR (Compositional Log-Ratio)
+# ==========================================================
+tbl_clr <- clr(tbl_mat + 1e-6)  # pseudocount per evitare log(0)
+
+# ==========================================================
+# 7️⃣ METADATI (library + barcode)
+# ==========================================================
+meta <- tbl_rel_sum %>%
+  mutate(
+    sample_id = paste(library, sample, sep = "_"),
+    barcode = sample
+  ) %>%
+  distinct(sample_id, library, barcode) %>%
+  arrange(sample_id)
+
+# Allinea l’ordine tra matrice e meta
+tbl_mat <- tbl_mat[meta$sample_id, ]
+
+# ==========================================================
+# 8️⃣ PCA PRIMA DELLA CORREZIONE BATCH
+# ==========================================================
+pca_res <- prcomp(tbl_clr, scale. = TRUE)
+
+pca_df <- data.frame(
+  sample = rownames(pca_res$x),
+  PC1 = pca_res$x[, 1],
+  PC2 = pca_res$x[, 2]
+) %>%
+  left_join(meta, by = c("sample" = "sample_id"))
+
+png("pca_prebatch.png", width = 1080, height = 1080)
+ggplot(pca_df, aes(x = PC1, y = PC2, color = library, label = barcode)) +
+  geom_point(size = 3) +
+  geom_text_repel(size = 3) +
+  theme_minimal() +
+  labs(title = "PCA microbioma - PRIMA della correzione batch (ComBat)")
+dev.off()
+
+# ==========================================================
+# 9️⃣ CORREZIONE BATCH (ComBat)
+# ==========================================================
+# Crea il batch vector e la covariata
+batch <- meta$library
+disease <- meta$disease
+
+# Design matrix: modello per conservare l’effetto biologico del disease
+mod <- model.matrix(~ disease)
+
+combat_data <- ComBat(
+  dat = t(tbl_clr),
+  batch = batch,
+  mod = mod,        # 👈 aggiungi questo
+  par.prior = TRUE,
+  prior.plots = FALSE
+)
+
+# Torna a samples x features
+combat_data <- t(combat_data)
+
+pca_res_combat <- prcomp(combat_data, scale. = TRUE)
+
+pca_df_combat <- data.frame(
+  sample = rownames(pca_res_combat$x),
+  PC1 = pca_res_combat$x[, 1],
+  PC2 = pca_res_combat$x[, 2]
+) %>%
+  left_join(meta, by = c("sample" = "sample_id"))
+
+png("pca_post_combast_disease.png", width = 1080, height = 1080)
+ggplot(pca_df_combat, aes(x = PC1, y = PC2, color = disease, shape = library)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(title = "PCA microbioma - DOPO correzione batch (ComBat con covariata disease)")
+dev.off()
+
+# ==========================================================
+# ✅ FINE SCRIPT
+# ==========================================================
+cat("✅ Analisi completata! Grafici salvati:\n - pca_prebatch.png\n - pca_post_combat.png\n")
