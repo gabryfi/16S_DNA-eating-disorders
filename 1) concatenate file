@@ -1,0 +1,21 @@
+#### unire tutte le letture di un barcode prima del mapping
+✔ raccoglie i FASTQ di ogni barcode
+✔ li decomprime
+✔ li concatena in un unico file
+✔ salva i file finali in una cartella di output
+##########################################################
+
+
+path_to_barcodes="fastq_pass"
+output_dir="combined_fastq_library_H"
+
+mkdir -p "$output_dir"
+
+for barcode in $(seq -w 1 24); do 
+    echo "#-------------------- Combining barcode_${barcode} fastqs --------------------#"
+    zcat "$path_to_barcodes"/barcode${barcode}/*.fastq.gz > "$output_dir"/barcode_${barcode}.combined.fastq
+done
+
+for barcode in $(seq -w 1 24); do 
+    NanoPlot -t 40 --fastq combined_fastq_library_H/barcode_${barcode}.combined.fastq --outdir Nanoplot_${barcode}_library_H --plots dot
+done
