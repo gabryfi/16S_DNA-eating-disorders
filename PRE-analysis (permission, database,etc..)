@@ -1,0 +1,9 @@
+
+# permessi alle cartelle
+sudo chmod -R 777 /percorso/della/cartella
+
+# costruzione database
+kraken2-build --standard --db ncbi1600 --kmer-len 26 --minimizer-len 21 --minimizer-spaces 5 --threads 40
+bracken-build -d ncbi1600 -t 50 -k 26 -l 1500
+
+
