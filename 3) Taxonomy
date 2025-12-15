@@ -6,20 +6,24 @@
 
 # db building explained in README
 # Loop for each barcode of Library XXXX
+
 for barcode in $(seq -w 1 24); do
     echo "Starting Kraken2 on barcode_${barcode}..."
-    kraken2 --db ../../ncbi_k26 \
-            --report report_${barcode}.txt  \
-            ../braken_ncbi_species/barcode_${barcode}.fasta
+    kraken2 --db /media/user/8Tb/16s_nanopore/ncbi1600 \
+            --report report_${barcode}.txt \
+            barcode_${barcode}.trimmed.fastq
 done
 
-# Bracken (abundance estimation)
+
+
 for barcode in $(seq -w 1 24); do
     echo "Starting Bracken on report_${barcode}.txt..."
-    bracken -d ../../ncbi_k26 \
+    bracken -d /media/user/8Tb/16s_nanopore/ncbi1600 \
             -i report_${barcode}.txt \
             -o barcode_${barcode}.bracken \
             -w barcode_${barcode}_bracken_report.txt \
             -r 1500 \
-            -l S 
+            -l S
 done
+
+
