@@ -7,14 +7,47 @@
 # db building explained in README
 # Loop for each barcode of Library XXXX
 
+
+# Kraken2
+# comando lanciato ultime 3 library
+
+kraken2 \
+  --db /media/user/8Tb/16s_nanopore/ncbi1600 \
+  --threads 48 \
+  --report barcode_01.report.txt \
+  barcode_01.porechop.fastq \
+  > barcode_01.kraken.txt
+
+
+
+
+
 for barcode in $(seq -w 1 24); do
     echo "Starting Kraken2 on barcode_${barcode}..."
     kraken2 --db /media/user/8Tb/16s_nanopore/ncbi1600 \
             --report report_${barcode}.txt \
             barcode_${barcode}.trimmed.fastq
 done
+##################################################################
 
+# Braken
+# comando lanciato ultime 3 library
 
+for report in *.report.txt; do
+    base=$(basename "$report" .report.txt)
+
+    echo "Starting Bracken on ${report}..."
+
+    bracken \
+      -d /media/user/8Tb/16s_nanopore/ncbi1600 \
+      -i "$report" \
+      -o "${base}.bracken" \
+      -w "${base}_bracken_report.txt" \
+      -r 1500 \
+      -l S
+done
+
+###################################################################
 
 for barcode in $(seq -w 1 24); do
     echo "Starting Bracken on report_${barcode}.txt..."
@@ -26,4 +59,4 @@ for barcode in $(seq -w 1 24); do
             -l S
 done
 
-
+###################################################################
