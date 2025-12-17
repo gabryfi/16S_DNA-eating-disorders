@@ -6,4 +6,10 @@ sudo chmod -R 777 /percorso/della/cartella
 kraken2-build --standard --db ncbi1600 --kmer-len 26 --minimizer-len 21 --minimizer-spaces 5 --threads 40
 bracken-build -d ncbi1600 -t 50 -k 26 -l 1500
 
+#comando lanciato sulle ultime 3 library (H,I,L)
+bracken-build \
+  -d /media/user/8Tb/16s_nanopore/ncbi1600 \
+  -k 35 \
+  -l 1500 \
+  -t 30
 
