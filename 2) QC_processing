@@ -16,8 +16,6 @@ for barcode in $(seq -w 1 24); do
 	--discard_middle \
         --extra_end_trim 0
     # Step 2: trimming
-    fastcat \
-        --min_length 1200 --max_length 1950 --min_qscore 10 \
-        barcode_${barcode}.porechop.fastq > barcode_${barcode}.trimmed.fastq 
+for barcode in $(seq -w 1 24); do
+    fastcat barcode_${barcode}.porechop.fastq > barcode_${barcode}.trimmed.fastq
 done
-
