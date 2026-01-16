@@ -1,35 +1,38 @@
-#### QC 
-#Uses porechop to remove primers and adapters from the combined FASTQ file.
-#Uses fastcat to filter reads by length (1200–1950 bp) and minimum quality (Q≥10). Saves the final trimmed FASTQ as barcode_XX.trimmed.fastq.
-#################################################################################
+# ===== STEP 03: PORECHOP =====
+echo "### [$(date)] STEP 03 – Porechop | library ${LIBRARY}" | tee "${LOG_DIR}/porechop.log"
 
+for barcode in $(seq -w 1 $N_BARCODES); do
+    INPUT="${COMBINED_DIR}/library_${LIBRARY}_barcode_${barcode}_combined.fastq"
+    OUTPUT="${PORECHOP_DIR}/library_${LIBRARY}_barcode_${barcode}_porechop.fastq"
 
-#!/bin/bash
-#!/bin/bash
-
-for barcode in $(seq -w 1 24); do
-    INPUT="../combined_fastq_library_f/barcode_${barcode}.combined.fastq"
-    OUTPUT="barcode_${barcode}.porechop.fastq"
-
-    echo "#-------------------- Trimming barcode_${barcode} --------------------#"
+    echo "#--- Trimming barcode_${barcode} ---#" | tee -a "${LOG_DIR}/porechop.log"
 
     if [[ ! -f "$INPUT" ]]; then
-        echo "ATTENZIONE: file $INPUT non trovato, salto barcode_${barcode}"
+        echo "ATTENZIONE: file mancante ($INPUT), salto barcode_${barcode}" | tee -a "${LOG_DIR}/porechop.log"
         continue
     fi
 
-    porechop \
-        -i "$INPUT" \
-        -o "$OUTPUT" \
-        --check_reads 1000 \
-        --discard_middle \
-        --extra_end_trim 0
+    porechop -i "$INPUT" -o "$OUTPUT" --check_reads 1000 --discard_middle --extra_end_trim 0 \
+        >> "${LOG_DIR}/porechop.log" 2>&1
 
-    echo "Completato barcode_${barcode}"
+    echo "Completato barcode_${barcode}" | tee -a "${LOG_DIR}/porechop.log"
 done
 
+# ===== STEP 04: Filtlong =====
+echo "### [$(date)] Filtlong – library ${LIBRARY}" | tee -a "${LOG_DIR}/filtlong.log"
 
-    # Step 2: trimming
-for barcode in $(seq -w 1 24); do
-    fastcat barcode_${barcode}.porechop.fastq > barcode_${barcode}.trimmed.fastq
+for barcode in $(seq -w 1 $N_BARCODES); do
+    INPUT="${PORECHOP_DIR}/library_${LIBRARY}_barcode_${barcode}_porechop.fastq"
+    OUTPUT="${FILTLONG_DIR}/library_${LIBRARY}_barcode_${barcode}_trimmed.fastq"
+
+    echo "#--- Filtering barcode_${barcode} ---#" | tee -a "${LOG_DIR}/filtlong.log"
+
+    if [[ ! -f "$INPUT" ]]; then
+        echo "ATTENZIONE: file mancante ($INPUT), salto barcode_${barcode}" | tee -a "${LOG_DIR}/filtlong.log"
+        continue
+    fi
+
+    filtlong --min_length 1200 --max_length 1950 --min_mean_q 10 "$INPUT" > "$OUTPUT" 2>> "${LOG_DIR}/filtlong.log"
+
+    echo "Completato barcode_${barcode}" | tee -a "${LOG_DIR}/filtlong.log"
 done
