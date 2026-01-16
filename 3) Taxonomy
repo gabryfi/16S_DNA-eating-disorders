@@ -11,52 +11,57 @@
 # Kraken2
 # comando lanciato ultime 3 library
 
-kraken2 \
-  --db /media/user/8Tb/16s_nanopore/ncbi1600 \
-  --threads 48 \
-  --report barcode_01.report.txt \
-  barcode_01.porechop.fastq \
-  > barcode_01.kraken.txt
-
-
-
-
-
 for barcode in $(seq -w 1 24); do
-    echo "Starting Kraken2 on barcode_${barcode}..."
-    kraken2 --db /media/user/8Tb/16s_nanopore/ncbi1600 \
-            --report report_${barcode}.txt \
-            barcode_${barcode}.trimmed.fastq
+    INPUT="porechop_fastq/barcode_${barcode}.porechop.fastq"
+    REPORT="barcode_${barcode}.report.txt"
+    OUTPUT="barcode_${barcode}.kraken.txt"
+
+    if [[ ! -f "$INPUT" ]]; then
+        echo "File $INPUT non trovato, salto barcode_${barcode}"
+        continue
+    fi
+
+    echo "Classificazione Kraken2 barcode_${barcode}"
+
+    kraken2 \
+        --db /media/user/8Tb/16s_nanopore/ncbi1600 \
+        --threads 48 \
+        --report "$REPORT" \
+        "$INPUT" \
+        > "$OUTPUT"
 done
-##################################################################
 
-# Braken
-# comando lanciato ultime 3 library
-
-for report in *.report.txt; do
-    base=$(basename "$report" .report.txt)
-
-    echo "Starting Bracken on ${report}..."
-
-    bracken \
-      -d /media/user/8Tb/16s_nanopore/ncbi1600 \
-      -i "$report" \
-      -o "${base}.bracken" \
-      -w "${base}_bracken_report.txt" \
-      -r 1500 \
-      -l S
-done
 
 ###################################################################
 
+#!/bin/bash
+
+# Creiamo le cartelle principali per i risultati
+mkdir -p bracken_results/bracken_files
+mkdir -p bracken_results/bracken_reports
+
 for barcode in $(seq -w 1 24); do
-    echo "Starting Bracken on report_${barcode}.txt..."
+    INPUT="barcode_${barcode}.report.txt"
+    OUT_BRACKEN="bracken_results/bracken_files/barcode_${barcode}.bracken"
+    OUT_REPORT="bracken_results/bracken_reports/barcode_${barcode}_bracken_report.txt"
+
+    if [[ ! -f "$INPUT" ]]; then
+        echo "ATTENZIONE: file $INPUT non trovato, salto barcode_${barcode}"
+        continue
+    fi
+
+    echo "Starting Bracken on $INPUT..."
+
     bracken -d /media/user/8Tb/16s_nanopore/ncbi1600 \
-            -i report_${barcode}.txt \
-            -o barcode_${barcode}.bracken \
-            -w barcode_${barcode}_bracken_report.txt \
+            -i "$INPUT" \
+            -o "$OUT_BRACKEN" \
+            -w "$OUT_REPORT" \
             -r 1500 \
             -l S
+
+    echo "Completato barcode_${barcode}"
 done
+
+echo "Tutti i barcode elaborati. I file sono in bracken_results/"
 
 ###################################################################
