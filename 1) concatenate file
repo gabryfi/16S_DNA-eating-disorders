@@ -1,21 +1,52 @@
-#### unire tutte le letture di un barcode prima del mapping
-✔ raccoglie i FASTQ di ogni barcode
-✔ li decomprime
-✔ li concatena in un unico file
-✔ salva i file finali in una cartella di output
-##########################################################
+#!/bin/bash
+set -euo pipefail
 
+# ===== PARAMETRI =====
+LIBRARY="B"            # <-- cambia solo questo
+N_BARCODES=24
+THREADS=40
+FASTQ_PASS="fastq_pass"
+BASE_DIR="library_${LIBRARY}_results"  # Cartella principale dei risultati
+# =====================
 
-path_to_barcodes="fastq_pass"
-output_dir="combined_fastq_library_H"
+# ===== CARTELLE =====
+COMBINED_DIR="${BASE_DIR}/01_combined_fastq"
+NANOPLOT_DIR="${BASE_DIR}/02_nanoplot"
+PORECHOP_DIR="${BASE_DIR}/03_porechop"
+FILTLONG_DIR="${BASE_DIR}/04_filtlong"
+KRAKEN_DIR="${BASE_DIR}/05_kraken"
+BRACKEN_DIR="${BASE_DIR}/06_bracken"
+LOG_DIR="${BASE_DIR}/logs"
 
-mkdir -p "$output_dir"
+mkdir -p "$COMBINED_DIR" "$NANOPLOT_DIR" "$PORECHOP_DIR" "$FILTLONG_DIR" \
+         "$KRAKEN_DIR" "$BRACKEN_DIR/bracken_files" "$BRACKEN_DIR/bracken_reports" "$LOG_DIR"
 
-for barcode in $(seq -w 1 24); do 
-    echo "#-------------------- Combining barcode_${barcode} fastqs --------------------#"
-    zcat "$path_to_barcodes"/barcode${barcode}/*.fastq.gz > "$output_dir"/barcode_${barcode}.combined.fastq
+# ===== STEP 01: COMBINE FASTQ =====
+echo "### [$(date)] Combining FASTQs – library ${LIBRARY}" | tee "${LOG_DIR}/combine_fastq.log"
+
+for barcode in $(seq -w 1 $N_BARCODES); do
+    echo "Combining barcode_${barcode}" | tee -a "${LOG_DIR}/combine_fastq.log"
+
+    zcat "${FASTQ_PASS}/barcode${barcode}"/*.fastq.gz \
+        > "${COMBINED_DIR}/library_${LIBRARY}_barcode_${barcode}_combined.fastq"
 done
 
-for barcode in $(seq -w 1 24); do 
-    NanoPlot -t 40 --fastq combined_fastq_library_H/barcode_${barcode}.combined.fastq --outdir Nanoplot_${barcode}_library_H --plots dot
+# ===== STEP 02: NANOPLOT =====
+CONDA_BASE=$(conda info --base)
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+conda activate nanoplot
+
+echo "### [$(date)] NanoPlot – library ${LIBRARY}" | tee "${LOG_DIR}/nanoplot.log"
+
+for barcode in $(seq -w 1 $N_BARCODES); do
+    OUTDIR="${NANOPLOT_DIR}/library_${LIBRARY}_barcode_${barcode}"
+    mkdir -p "$OUTDIR"
+
+    NanoPlot -t "$THREADS" \
+        --fastq "${COMBINED_DIR}/library_${LIBRARY}_barcode_${barcode}_combined.fastq" \
+        --outdir "$OUTDIR" \
+        --plots dot \
+        >> "${LOG_DIR}/nanoplot.log" 2>&1
 done
+
+conda activate 16s  # torna all'ambiente principale
