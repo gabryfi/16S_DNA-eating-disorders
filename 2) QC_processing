@@ -5,16 +5,30 @@
 
 
 #!/bin/bash
-for barcode in $(seq -w 1 24); do 
-    echo "#-------------------- Trimming barcode_${barcode} fastqs --------------------#"
+#!/bin/bash
 
-    # Step 1: Primer and adaptors removal Porechop
+for barcode in $(seq -w 1 24); do
+    INPUT="../combined_fastq_library_f/barcode_${barcode}.combined.fastq"
+    OUTPUT="barcode_${barcode}.porechop.fastq"
+
+    echo "#-------------------- Trimming barcode_${barcode} --------------------#"
+
+    if [[ ! -f "$INPUT" ]]; then
+        echo "ATTENZIONE: file $INPUT non trovato, salto barcode_${barcode}"
+        continue
+    fi
+
     porechop \
-        -i ../combined_fastq_library_f/barcode_${barcode}.combined.fastq \
-        -o barcode_${barcode}.porechop.fastq \
-	--check_reads 1000 \
-	--discard_middle \
+        -i "$INPUT" \
+        -o "$OUTPUT" \
+        --check_reads 1000 \
+        --discard_middle \
         --extra_end_trim 0
+
+    echo "Completato barcode_${barcode}"
+done
+
+
     # Step 2: trimming
 for barcode in $(seq -w 1 24); do
     fastcat barcode_${barcode}.porechop.fastq > barcode_${barcode}.trimmed.fastq
